@@ -22,6 +22,7 @@ AUTOCONF = .\config.msvc
 XML_NAME = xml2
 XML_BASENAME = lib$(XML_NAME)
 XML_SO = $(XML_BASENAME).dll
+XML_SO_PDB = $(XML_BASENAME).pdb
 XML_RES = $(XML_BASENAME).res
 XML_IMP = $(XML_BASENAME).lib
 XML_DEF = $(XML_BASENAME).def
@@ -331,17 +332,18 @@ install-libs : all
 	if not exist $(SOPREFIX) mkdir $(SOPREFIX)
 	copy $(XML_SRCDIR)\include\libxml\*.h $(INCPREFIX)\libxml2\libxml
 	copy $(BINDIR)\$(XML_SO) $(SOPREFIX)
+	copy $(BINDIR)\$(XML_SO_PDB) $(SOPREFIX)
 	copy $(BINDIR)\$(XML_A) $(LIBPREFIX)
 	copy $(BINDIR)\$(XML_A_DLL) $(LIBPREFIX)
 	copy $(BINDIR)\$(XML_IMP) $(LIBPREFIX)
 
 install : install-libs 
 	copy $(BINDIR)\*.exe $(BINPREFIX)
-	-copy $(BINDIR)\*.pdb $(BINPREFIX)
+	copy $(BINDIR)\*.pdb $(BINPREFIX)
 
 install-dist : install-libs 
 	copy $(BINDIR)\xml*.exe $(BINPREFIX)
-	-copy $(BINDIR)\xml*.pdb $(BINPREFIX)
+	copy $(BINDIR)\xml*.pdb $(BINPREFIX)
 
 # This is a target for me, to make a binary distribution. Not for the public use,
 # keep your hands off :-)

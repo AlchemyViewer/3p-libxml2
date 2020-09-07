@@ -72,14 +72,51 @@ case "$AUTOBUILD_PLATFORM" in
         # Use python -u, else the resulting PATH will end with a spurious
         # '\r'.
         export PATH="$(python -u -c "import sys
-        from collections import OrderedDict
-        print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'))))" "$PATH")"
+from collections import OrderedDict
+print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'))))" "$PATH")"
         
+        mkdir -p "$stage/lib/debug"
         mkdir -p "$stage/lib/release"
         
         pushd "win32"
+
+        # Debug Build
+        cscript configure.js zlib=yes icu=no static=no debug=yes python=no iconv=no \
+        compiler=msvc \
+        include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
+        lib="$(cygpath -w $stage/packages/lib/debug)" \
+        prefix="$(cygpath -w $stage)" \
+        sodir="$(cygpath -w $stage/lib/debug)" \
+        libdir="$(cygpath -w $stage/lib/debug)"
         
-        cscript configure.js zlib=yes icu=no static=yes debug=no python=no iconv=no \
+        nmake /f Makefile.msvc ZLIB_LIBRARY=zlibd.lib all
+        nmake /f Makefile.msvc install
+        
+        # conditionally run unit tests
+        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+            cp -a "$stage/packages/lib/debug/zlibd1.dll" bin.msvc/
+
+            # There is one particular test .xml file that has started
+            # failing consistently on our Windows build hosts. The
+            # file is full of errors; but it's as if the test harness
+            # has forgotten that this particular test is SUPPOSED to
+            # produce errors! We can bypass it simply by renaming the
+            # file: the test is based on picking up *.xml from that
+            # directory.
+            # Don't forget, we're in libxml2/win32 at the moment.
+            badtest="$TOP/$SOURCE_DIR/test/errors/759398.xml"
+            [ -f "$badtest" ] && mv "$badtest" "$badtest.hide"
+            nmake /f Makefile.msvc checktests
+            # Make sure we move it back after testing. It's not good
+            # for a build script to leave modifications to a source
+            # tree that's under version control.
+            [ -f "$badtest.hide" ] && mv "$badtest.hide" "$badtest"
+        fi
+        
+        nmake /f Makefile.msvc clean
+
+        # Release Build
+        cscript configure.js zlib=yes icu=no static=no debug=no python=no iconv=no \
         compiler=msvc \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/release)" \
@@ -92,6 +129,8 @@ case "$AUTOBUILD_PLATFORM" in
         
         # conditionally run unit tests
         if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+            cp -a "$stage/packages/lib/release/zlib1.dll" bin.msvc/
+
             # There is one particular test .xml file that has started
             # failing consistently on our Windows build hosts. The
             # file is full of errors; but it's as if the test harness
