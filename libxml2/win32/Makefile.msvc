@@ -106,13 +106,13 @@ ARFLAGS = /nologo
 
 # Optimisation and debug symbols.
 !if "$(DEBUG)" == "1"
-CFLAGS = $(CFLAGS) /D "_DEBUG" /Od /Z7
-LDFLAGS = $(LDFLAGS) /DEBUG /NODEFAULTLIB:LIBCMT
+CFLAGS = $(CFLAGS) /D "_DEBUG" /Od /Zi
+LDFLAGS = $(LDFLAGS) /DEBUG:FULL /NODEFAULTLIB:LIBCMT
 !else
-CFLAGS = $(CFLAGS) /D "NDEBUG" /O2 
+CFLAGS = $(CFLAGS) /D "NDEBUG" /O2 /Ob3 /Gy /GL /Zi
 # commented out as this break VC10 c.f. 634846
 # LDFLAGS = $(LDFLAGS) /OPT:NOWIN98
-LDFLAGS = $(LDFLAGS) /NODEFAULTLIB:LIBCMT
+LDFLAGS = $(LDFLAGS) /OPT:REF /OPT:ICF /LTCG /DEBUG:FULL /NODEFAULTLIB:LIBCMT
 !endif
 
 # Utility commands (prevent conflict with cygwin path executables)
