@@ -45,8 +45,7 @@ major_version="$(sed -n -E 's/LIBXML_MAJOR_VERSION=([0-9]+)/\1/p' "$configure")"
 minor_version="$(sed -n -E 's/LIBXML_MINOR_VERSION=([0-9]+)/\1/p' "$configure")"
 micro_version="$(sed -n -E 's/LIBXML_MICRO_VERSION=([0-9]+)/\1/p' "$configure")"
 version="${major_version}.${minor_version}.${micro_version}"
-build=${AUTOBUILD_BUILD_ID:=0}
-echo "${version}.${build}" > "${stage}/VERSION.txt"
+echo "${version}" > "${stage}/VERSION.txt"
 
 pushd "$TOP/$SOURCE_DIR"
 case "$AUTOBUILD_PLATFORM" in
@@ -276,5 +275,3 @@ popd
 
 mkdir -p "$stage/LICENSES"
 cp "$TOP/$SOURCE_DIR/$LICENSE" "$stage/LICENSES/$PROJECT.txt"
-mkdir -p "$stage"/docs/libxml2/
-cp -a "$TOP"/README.Linden "$stage"/docs/libxml2/
