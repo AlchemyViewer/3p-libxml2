@@ -45,7 +45,7 @@ CPPFLAGS = $(CPPFLAGS) /D "_REENTRANT"
 
 # The compiler and its options.
 CC = cl.exe
-CFLAGS = /nologo /D "_WINDOWS" /D "_MBCS" /D "NOLIBTOOL" /W3 /wd4244 /wd4267 /D "ZLIB_DLL" $(CRUNTIME)
+CFLAGS = /nologo /D "_WINDOWS" /D "_MBCS" /D "NOLIBTOOL" /W3 /wd4244 /wd4267 $(CRUNTIME)
 CFLAGS = $(CFLAGS) /I$(XML_SRCDIR) /I$(XML_SRCDIR)\include /I$(INCPREFIX)
 !if "$(WITH_THREADS)" != "no"
 CFLAGS = $(CFLAGS) /D "_REENTRANT"
@@ -106,13 +106,13 @@ ARFLAGS = /nologo
 
 # Optimisation and debug symbols.
 !if "$(DEBUG)" == "1"
-CFLAGS = $(CFLAGS) /D "_DEBUG" /Od /Zi
+CFLAGS = $(CFLAGS) /D "_DEBUG" /Od /Z7
 LDFLAGS = $(LDFLAGS) /DEBUG:FULL /NODEFAULTLIB:LIBCMT
 !else
-CFLAGS = $(CFLAGS) /D "NDEBUG" /O2 /Ob3 /Gy /GL /Zi
+CFLAGS = $(CFLAGS) /D "NDEBUG" /O2 /Ob3 /Gy /Z7
 # commented out as this break VC10 c.f. 634846
 # LDFLAGS = $(LDFLAGS) /OPT:NOWIN98
-LDFLAGS = $(LDFLAGS) /OPT:REF /OPT:ICF /LTCG /DEBUG:FULL /NODEFAULTLIB:LIBCMT
+LDFLAGS = $(LDFLAGS) /OPT:REF /OPT:ICF /DEBUG:FULL /NODEFAULTLIB:LIBCMT
 !endif
 
 # Utility commands (prevent conflict with cygwin path executables)

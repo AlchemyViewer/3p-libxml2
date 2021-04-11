@@ -80,7 +80,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         pushd "win32"
 
         # Debug Build
-        cscript configure.js zlib=yes icu=no static=no debug=yes python=no iconv=no \
+        cscript configure.js zlib=yes icu=no static=yes debug=yes python=no iconv=no \
         compiler=msvc \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/debug)" \
@@ -93,8 +93,6 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         
         # conditionally run unit tests
         if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            cp -a "$stage/packages/lib/debug/zlibd1.dll" bin.msvc/
-
             # There is one particular test .xml file that has started
             # failing consistently on our Windows build hosts. The
             # file is full of errors; but it's as if the test harness
@@ -115,7 +113,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         nmake /f Makefile.msvc clean
 
         # Release Build
-        cscript configure.js zlib=yes icu=no static=no debug=no python=no iconv=no \
+        cscript configure.js zlib=yes icu=no static=yes debug=no python=no iconv=no \
         compiler=msvc \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/release)" \
@@ -128,8 +126,6 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         
         # conditionally run unit tests
         if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            cp -a "$stage/packages/lib/release/zlib1.dll" bin.msvc/
-
             # There is one particular test .xml file that has started
             # failing consistently on our Windows build hosts. The
             # file is full of errors; but it's as if the test harness
