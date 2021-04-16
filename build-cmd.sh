@@ -219,9 +219,9 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         # get the dependent packages in there as well.  Process
         # may find the system zlib.h but it won't find the
         # packaged one.
-        CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib" \
-        CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib" \
-        CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib" \
+        CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+        CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+        CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
         LDFLAGS="$opts -L$stage/packages/lib/release" \
         ./configure --with-python=no --with-pic --with-zlib \
             --disable-shared --enable-static \
@@ -260,7 +260,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         JOBS=`sysctl -n hw.ncpu`
 
         # force regenerate autoconf
-        # autoreconf -fvi
+        autoreconf -fvi
 
         mkdir -p "build_debug"
         pushd "build_debug"
