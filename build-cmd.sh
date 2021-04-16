@@ -206,7 +206,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
         CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
         LDFLAGS="$opts -L$stage/packages/lib/debug" \
-        ./configure --with-python=no --with-pic --with-zlib \
+        ./configure --with-python=no --with-pic --with-zlib --without-lzma \
             --disable-shared --enable-static \
             --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
         make -j$JOBS
@@ -223,7 +223,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
         CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
         LDFLAGS="$opts -L$stage/packages/lib/release" \
-        ./configure --with-python=no --with-pic --with-zlib \
+        ./configure --with-python=no --with-pic --with-zlib --without-lzma \
             --disable-shared --enable-static \
             --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
         make -j$JOBS
@@ -269,7 +269,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
             CXXFLAGS="$DEBUG_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
             LDFLAGS="$DEBUG_LDFLAGS -L${stage}/packages/lib/debug" \
             ../configure --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug" \
-                --with-python=no --with-pic --with-zlib --disable-shared --enable-static
+                --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
 
             make -j$JOBS
             make install DESTDIR="$stage"
@@ -287,7 +287,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
             CXXFLAGS="$RELEASE_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
             LDFLAGS="$RELEASE_LDFLAGS -L${stage}/packages/lib/release" \
             ../configure --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release" \
-                --with-python=no --with-pic --with-zlib --disable-shared --enable-static
+                --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
 
             make -j$JOBS
             make install DESTDIR="$stage"
