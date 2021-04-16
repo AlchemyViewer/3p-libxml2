@@ -29,6 +29,11 @@
 #endif
 #ifdef LIBXML_ZLIB_ENABLED
 #include <zlib.h>
+// <ALCHEMY>
+#if !defined(ZLIBNG_VERSION) && defined(ALBUILD)
+#error "Using incorrect zlib variant for 3p build"
+#endif
+// </ALCHEMY>
 #endif
 
 #include <libxml/xmlmemory.h>

@@ -202,9 +202,9 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         # get the dependent packages in there as well.  Process
         # may find the system zlib.h but it won't find the
         # packaged one.
-        CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib" \
-        CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib" \
-        CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib" \
+        CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+        CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+        CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
         LDFLAGS="$opts -L$stage/packages/lib/debug" \
         ./configure --with-python=no --with-pic --with-zlib \
             --disable-shared --enable-static \
@@ -238,28 +238,65 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
     ;;
     
     darwin*)
-        opts="${TARGET_OPTS:--arch $AUTOBUILD_CONFIGURE_ARCH $LL_BUILD_RELEASE}"
-        
-        # Release last for configuration headers
-        # CPPFLAGS will be used by configure and we need to
-        # get the dependent packages in there as well.  Process
-        # may find the system zlib.h but it won't find the
-        # packaged one.
-        CFLAGS="$opts -I$stage/packages/include/zlib" \
-        CPPFLAGS="${CPPFLAGS:-} -I$stage/packages/include/zlib" \
-        LDFLAGS="$opts -L$stage/packages/lib/release" \
-        ./configure --with-python=no --with-pic --with-zlib \
-        --disable-shared --enable-static \
-        --prefix="$stage" --libdir="$stage"/lib/release
-        make
-        make install
-        
-        # conditionally run unit tests
-        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            make check
-        fi
-        
-        make clean
+        # Setup osx sdk platform
+        SDKNAME="macosx"
+        export SDKROOT=$(xcodebuild -version -sdk ${SDKNAME} Path)
+        export MACOSX_DEPLOYMENT_TARGET=10.13
+
+        # Setup build flags
+        ARCH_FLAGS="-arch x86_64"
+        SDK_FLAGS="-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET} -isysroot ${SDKROOT}"
+        DEBUG_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -O0 -g -msse4.2 -fPIC -DPIC"
+        RELEASE_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -O3 -g -msse4.2 -fPIC -DPIC -fstack-protector-strong"
+        DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
+        RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
+        DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
+        RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
+        DEBUG_CPPFLAGS="-DPIC"
+        RELEASE_CPPFLAGS="-DPIC"
+        DEBUG_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names"
+        RELEASE_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names"
+
+        JOBS=`sysctl -n hw.ncpu`
+
+        # force regenerate autoconf
+        # autoreconf -fvi
+
+        mkdir -p "build_debug"
+        pushd "build_debug"
+            CFLAGS="$DEBUG_CFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="$DEBUG_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$DEBUG_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$DEBUG_LDFLAGS -L${stage}/packages/lib/debug" \
+            ../configure --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug" \
+                --with-python=no --with-pic --with-zlib --disable-shared --enable-static
+
+            make -j$JOBS
+            make install DESTDIR="$stage"
+
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+        popd
+
+        mkdir -p "build_release"
+        pushd "build_release"
+            CFLAGS="$RELEASE_CFLAGS  -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="$RELEASE_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$RELEASE_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$RELEASE_LDFLAGS -L${stage}/packages/lib/release" \
+            ../configure --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release" \
+                --with-python=no --with-pic --with-zlib --disable-shared --enable-static
+
+            make -j$JOBS
+            make install DESTDIR="$stage"
+
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+        popd
     ;;
     
     *)
