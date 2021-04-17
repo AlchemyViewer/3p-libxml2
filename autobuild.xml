@@ -215,8 +215,8 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/libxml2.*</string>
-            <string>lib/release/libxml2.*</string>
+            <string>lib/debug/libxml2_a.*</string>
+            <string>lib/release/libxml2_a.*</string>
           </array>
           <key>name</key>
           <string>windows</string>
