@@ -81,7 +81,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
 
         # Debug Build
         cscript configure.js zlib=yes icu=no static=yes debug=yes python=no iconv=no \
-        compiler=msvc \
+        compiler=msvc cruntime="/MDd" \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/debug)" \
         prefix="$(cygpath -w $stage)" \
@@ -114,7 +114,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
 
         # Release Build
         cscript configure.js zlib=yes icu=no static=yes debug=no python=no iconv=no \
-        compiler=msvc \
+        compiler=msvc cruntime="/MD" \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/release)" \
         prefix="$(cygpath -w $stage)" \
