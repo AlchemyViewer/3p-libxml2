@@ -195,46 +195,57 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         # force regenerate autoconf
         autoreconf -fvi
 
-        # debug configure and build
-        export PKG_CONFIG_PATH="$stage/packages/lib/debug/pkgconfig:${OLD_PKG_CONFIG_PATH}"
-        
-        # CPPFLAGS will be used by configure and we need to
-        # get the dependent packages in there as well.  Process
-        # may find the system zlib.h but it won't find the
-        # packaged one.
-        CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-        CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-        CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
-        LDFLAGS="$opts -L$stage/packages/lib/debug" \
-        ./configure --with-python=no --with-pic --with-zlib --without-lzma \
-            --disable-shared --enable-static \
-            --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
-        make -j$JOBS
-        make install DESTDIR="$stage"
+        mkdir -p "build_debug"
+        pushd "build_debug"
+            # debug configure and build
+            export PKG_CONFIG_PATH="$stage/packages/lib/debug/pkgconfig:${OLD_PKG_CONFIG_PATH}"
+            
+            # CPPFLAGS will be used by configure and we need to
+            # get the dependent packages in there as well.  Process
+            # may find the system zlib.h but it won't find the
+            # packaged one.
+            CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$opts -L$stage/packages/lib/debug" \
+            ../configure --with-python=no --with-pic --with-zlib --without-lzma \
+                --disable-shared --enable-static \
+                --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
 
-        # release configure and build
-        export PKG_CONFIG_PATH="$stage/packages/lib/release/pkgconfig:${OLD_PKG_CONFIG_PATH}"
-        
-        # CPPFLAGS will be used by configure and we need to
-        # get the dependent packages in there as well.  Process
-        # may find the system zlib.h but it won't find the
-        # packaged one.
-        CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-        CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-        CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
-        LDFLAGS="$opts -L$stage/packages/lib/release" \
-        ./configure --with-python=no --with-pic --with-zlib --without-lzma \
-            --disable-shared --enable-static \
-            --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
-        make -j$JOBS
-        make install DESTDIR="$stage"
-        
-        # conditionally run unit tests
-        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            make check
-        fi
-        
-        make clean
+            make -j$JOBS
+            make install DESTDIR="$stage"
+            
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+	popd
+
+        mkdir -p "build_release"
+        pushd "build_release"
+            # release configure and build
+            export PKG_CONFIG_PATH="$stage/packages/lib/release/pkgconfig:${OLD_PKG_CONFIG_PATH}"
+            
+            # CPPFLAGS will be used by configure and we need to
+            # get the dependent packages in there as well.  Process
+            # may find the system zlib.h but it won't find the
+            # packaged one.
+            CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$opts -L$stage/packages/lib/release" \
+            ../configure --with-python=no --with-pic --with-zlib --without-lzma \
+                --disable-shared --enable-static \
+                --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
+
+            make -j$JOBS
+            make install DESTDIR="$stage"
+            
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+        popd
     ;;
     
     darwin*)
