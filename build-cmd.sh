@@ -45,8 +45,7 @@ major_version="$(sed -n -E 's/LIBXML_MAJOR_VERSION=([0-9]+)/\1/p' "$configure")"
 minor_version="$(sed -n -E 's/LIBXML_MINOR_VERSION=([0-9]+)/\1/p' "$configure")"
 micro_version="$(sed -n -E 's/LIBXML_MICRO_VERSION=([0-9]+)/\1/p' "$configure")"
 version="${major_version}.${minor_version}.${micro_version}"
-build=${AUTOBUILD_BUILD_ID:=0}
-echo "${version}.${build}" > "${stage}/VERSION.txt"
+echo "${version}" > "${stage}/VERSION.txt"
 
 pushd "$TOP/$SOURCE_DIR"
 case "$AUTOBUILD_PLATFORM" in
@@ -81,8 +80,8 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         pushd "win32"
 
         # Debug Build
-        cscript configure.js zlib=yes icu=no static=no debug=yes python=no iconv=no \
-        compiler=msvc \
+        cscript configure.js zlib=yes icu=no static=yes debug=yes python=no iconv=no \
+        compiler=msvc cruntime="/MDd" \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/debug)" \
         prefix="$(cygpath -w $stage)" \
@@ -94,8 +93,6 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         
         # conditionally run unit tests
         if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            cp -a "$stage/packages/lib/debug/zlibd1.dll" bin.msvc/
-
             # There is one particular test .xml file that has started
             # failing consistently on our Windows build hosts. The
             # file is full of errors; but it's as if the test harness
@@ -116,8 +113,8 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         nmake /f Makefile.msvc clean
 
         # Release Build
-        cscript configure.js zlib=yes icu=no static=no debug=no python=no iconv=no \
-        compiler=msvc \
+        cscript configure.js zlib=yes icu=no static=yes debug=no python=no iconv=no \
+        compiler=msvc cruntime="/MD" \
         include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
         lib="$(cygpath -w $stage/packages/lib/release)" \
         prefix="$(cygpath -w $stage)" \
@@ -129,8 +126,6 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         
         # conditionally run unit tests
         if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            cp -a "$stage/packages/lib/release/zlib1.dll" bin.msvc/
-
             # There is one particular test .xml file that has started
             # failing consistently on our Windows build hosts. The
             # file is full of errors; but it's as if the test harness
@@ -200,71 +195,119 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         # force regenerate autoconf
         autoreconf -fvi
 
-        # debug configure and build
-        export PKG_CONFIG_PATH="$stage/packages/lib/debug/pkgconfig:${OLD_PKG_CONFIG_PATH}"
-        
-        # CPPFLAGS will be used by configure and we need to
-        # get the dependent packages in there as well.  Process
-        # may find the system zlib.h but it won't find the
-        # packaged one.
-        CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib" \
-        CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib" \
-        CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib" \
-        LDFLAGS="$opts -L$stage/packages/lib/debug" \
-        ./configure --with-python=no --with-pic --with-zlib \
-            --disable-shared --enable-static \
-            --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
-        make -j$JOBS
-        make install DESTDIR="$stage"
+        mkdir -p "build_debug"
+        pushd "build_debug"
+            # debug configure and build
+            export PKG_CONFIG_PATH="$stage/packages/lib/debug/pkgconfig:${OLD_PKG_CONFIG_PATH}"
+            
+            # CPPFLAGS will be used by configure and we need to
+            # get the dependent packages in there as well.  Process
+            # may find the system zlib.h but it won't find the
+            # packaged one.
+            CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$opts -L$stage/packages/lib/debug" \
+            ../configure --with-python=no --with-pic --with-zlib --without-lzma \
+                --disable-shared --enable-static \
+                --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
 
-        # release configure and build
-        export PKG_CONFIG_PATH="$stage/packages/lib/release/pkgconfig:${OLD_PKG_CONFIG_PATH}"
-        
-        # CPPFLAGS will be used by configure and we need to
-        # get the dependent packages in there as well.  Process
-        # may find the system zlib.h but it won't find the
-        # packaged one.
-        CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib" \
-        CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib" \
-        CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib" \
-        LDFLAGS="$opts -L$stage/packages/lib/release" \
-        ./configure --with-python=no --with-pic --with-zlib \
-            --disable-shared --enable-static \
-            --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
-        make -j$JOBS
-        make install DESTDIR="$stage"
-        
-        # conditionally run unit tests
-        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            make check
-        fi
-        
-        make clean
+            make -j$JOBS
+            make install DESTDIR="$stage"
+            
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+	popd
+
+        mkdir -p "build_release"
+        pushd "build_release"
+            # release configure and build
+            export PKG_CONFIG_PATH="$stage/packages/lib/release/pkgconfig:${OLD_PKG_CONFIG_PATH}"
+            
+            # CPPFLAGS will be used by configure and we need to
+            # get the dependent packages in there as well.  Process
+            # may find the system zlib.h but it won't find the
+            # packaged one.
+            CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$opts -L$stage/packages/lib/release" \
+            ../configure --with-python=no --with-pic --with-zlib --without-lzma \
+                --disable-shared --enable-static \
+                --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
+
+            make -j$JOBS
+            make install DESTDIR="$stage"
+            
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+        popd
     ;;
     
     darwin*)
-        opts="${TARGET_OPTS:--arch $AUTOBUILD_CONFIGURE_ARCH $LL_BUILD_RELEASE}"
-        
-        # Release last for configuration headers
-        # CPPFLAGS will be used by configure and we need to
-        # get the dependent packages in there as well.  Process
-        # may find the system zlib.h but it won't find the
-        # packaged one.
-        CFLAGS="$opts -I$stage/packages/include/zlib" \
-        CPPFLAGS="${CPPFLAGS:-} -I$stage/packages/include/zlib" \
-        LDFLAGS="$opts -L$stage/packages/lib/release" \
-        ./configure --with-python=no --with-pic --with-zlib \
-        --disable-shared --enable-static \
-        --prefix="$stage" --libdir="$stage"/lib/release
-        make
-        make install
-        
-        # conditionally run unit tests
-        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            make check
-        fi
-        
-        make clean
+        # Setup osx sdk platform
+        SDKNAME="macosx"
+        export SDKROOT=$(xcodebuild -version -sdk ${SDKNAME} Path)
+        export MACOSX_DEPLOYMENT_TARGET=10.13
+
+        # Setup build flags
+        ARCH_FLAGS="-arch x86_64"
+        SDK_FLAGS="-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET} -isysroot ${SDKROOT}"
+        DEBUG_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -O0 -g -msse4.2 -fPIC -DPIC"
+        RELEASE_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -O3 -g -msse4.2 -fPIC -DPIC -fstack-protector-strong"
+        DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
+        RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
+        DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
+        RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
+        DEBUG_CPPFLAGS="-DPIC"
+        RELEASE_CPPFLAGS="-DPIC"
+        DEBUG_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names"
+        RELEASE_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names"
+
+        JOBS=`sysctl -n hw.ncpu`
+
+        # force regenerate autoconf
+        autoreconf -fvi
+
+        mkdir -p "build_debug"
+        pushd "build_debug"
+            CFLAGS="$DEBUG_CFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="$DEBUG_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$DEBUG_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$DEBUG_LDFLAGS -L${stage}/packages/lib/debug" \
+            ../configure --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug" \
+                --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
+
+            make -j$JOBS
+            make install DESTDIR="$stage"
+
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+        popd
+
+        mkdir -p "build_release"
+        pushd "build_release"
+            CFLAGS="$RELEASE_CFLAGS  -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CPPFLAGS="$RELEASE_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$RELEASE_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$RELEASE_LDFLAGS -L${stage}/packages/lib/release" \
+            ../configure --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release" \
+                --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
+
+            make -j$JOBS
+            make install DESTDIR="$stage"
+
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                make check
+            fi
+        popd
     ;;
     
     *)
@@ -276,5 +319,3 @@ popd
 
 mkdir -p "$stage/LICENSES"
 cp "$TOP/$SOURCE_DIR/$LICENSE" "$stage/LICENSES/$PROJECT.txt"
-mkdir -p "$stage"/docs/libxml2/
-cp -a "$TOP"/README.Linden "$stage"/docs/libxml2/
