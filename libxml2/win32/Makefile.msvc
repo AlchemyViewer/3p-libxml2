@@ -121,6 +121,11 @@ FIND = %windir%\system32\find.exe
 FINDSTR = %windir%\system32\findstr.exe
 DEL = %windir%\system32\del.exe
 
+# append CFLAGS etc. passed on command line
+CPPFLAGS = $(CPPFLAGS) $(EXTRA_CPPFLAGS)
+CFLAGS = $(CFLAGS) $(EXTRA_CFLAGS)
+LDFLAGS = $(LDFLAGS) $(EXTRA_LDFLAGS)
+
 # Libxml object files.
 XML_OBJS = $(XML_INTDIR)\buf.obj\
 	$(XML_INTDIR)\c14n.obj\
