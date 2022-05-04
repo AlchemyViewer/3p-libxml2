@@ -101,25 +101,25 @@
     </functions>
   </xsl:template>
   <xsl:template match="/api/symbols/functype">
-    <function name="{@name}" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="function" name="{@name}" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
   <xsl:template match="/api/symbols/function">
-    <function name="{@name} ()" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="function" name="{@name} ()" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
   <xsl:template match="/api/symbols/typedef">
-    <function name="{@name}" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="typedef" name="{@name}" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
   <xsl:template match="/api/symbols/enum">
-    <function name="{@name}" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="enum" name="{@name}" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
   <xsl:template match="/api/symbols/struct">
-    <function name="{@name}" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="struct" name="{@name}" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
   <xsl:template match="/api/symbols/macro">
-    <function name="{@name}" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="macro" name="{@name}" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
   <xsl:template match="/api/symbols/variable">
-    <function name="{@name}" link="libxml2-{@file}.html#{@name}"/>
+    <keyword type="macro" name="{@name}" link="libxml2-{@file}.html#{@name}"/>
   </xsl:template>
 
 </xsl:stylesheet>
