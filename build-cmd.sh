@@ -107,7 +107,7 @@ case "$AUTOBUILD_PLATFORM" in
         cp -a ${stage}/release/lib/libxml2s.lib ${stage}/lib/release/libxml2.lib
 
         # copy headers
-        cp -a $stage/release/include/libxml2/* $stage/include/libxml2/
+        cp -a $stage/release/include/* $stage/include/
     ;;
     
     linux*)
