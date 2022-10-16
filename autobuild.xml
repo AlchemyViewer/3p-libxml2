@@ -169,9 +169,7 @@
           <key>manifest</key>
           <array>
             <string>lib/debug/*.a</string>
-            <string>lib/debug/pkgconfig/*</string>
             <string>lib/release/*.a</string>
-            <string>lib/release/pkgconfig/*</string>
           </array>
           <key>name</key>
           <string>linux</string>
@@ -201,8 +199,8 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/libxml2_a.*</string>
-            <string>lib/release/libxml2_a.*</string>
+            <string>lib/debug/*.*</string>
+            <string>lib/release/*.*</string>
           </array>
           <key>name</key>
           <string>windows</string>

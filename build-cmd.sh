@@ -53,98 +53,60 @@ case "$AUTOBUILD_PLATFORM" in
     windows*)
         load_vsvars
         
-        # We've observed some weird failures in which the PATH is too big
-        # to be passed to a child process! When that gets munged, we start
-        # seeing errors like 'nmake' failing to find the 'cl.exe' command.
-        # Thing is, by this point in the script we've acquired a shocking
-        # number of duplicate entries. Dedup the PATH using Python's
-        # OrderedDict, which preserves the order in which you insert keys.
-        # We find that some of the Visual Studio PATH entries appear both
-        # with and without a trailing slash, which is pointless. Strip
-        # those off and dedup what's left.
-        # Pass the existing PATH as an explicit argument rather than
-        # reading it from the environment, to bypass the fact that cygwin
-        # implicitly converts PATH to Windows form when running a native
-        # executable. Since we're setting bash's PATH, leave everything in
-        # cygwin form. That means splitting and rejoining on ':' rather
-        # than on os.pathsep, which on Windows is ';'.
-        # Use python -u, else the resulting PATH will end with a spurious
-        # '\r'.
-        export PATH="$(python -u -c "import sys
-from collections import OrderedDict
-print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'))))" "$PATH")"
-        
+        mkdir -p "$stage/include/libxml2"
         mkdir -p "$stage/lib/debug"
         mkdir -p "$stage/lib/release"
-        
-        pushd "win32"
 
-        # Debug Build
-        cscript configure.js zlib=yes icu=no static=yes debug=yes python=no iconv=no \
-        compiler=msvc cruntime="/MDd" \
-        include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
-        lib="$(cygpath -w $stage/packages/lib/debug)" \
-        prefix="$(cygpath -w $stage)" \
-        sodir="$(cygpath -w $stage/lib/debug)" \
-        libdir="$(cygpath -w $stage/lib/debug)"
-        
-        nmake /f Makefile.msvc ZLIB_LIBRARY=zlibd.lib all
-        nmake /f Makefile.msvc install
-        
-        # conditionally run unit tests
-        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            # There is one particular test .xml file that has started
-            # failing consistently on our Windows build hosts. The
-            # file is full of errors; but it's as if the test harness
-            # has forgotten that this particular test is SUPPOSED to
-            # produce errors! We can bypass it simply by renaming the
-            # file: the test is based on picking up *.xml from that
-            # directory.
-            # Don't forget, we're in libxml2/win32 at the moment.
-            badtest="$TOP/$SOURCE_DIR/test/errors/759398.xml"
-            [ -f "$badtest" ] && mv "$badtest" "$badtest.hide"
-            nmake /f Makefile.msvc checktests || true
-            # Make sure we move it back after testing. It's not good
-            # for a build script to leave modifications to a source
-            # tree that's under version control.
-            [ -f "$badtest.hide" ] && mv "$badtest.hide" "$badtest"
-        fi
-        
-        nmake /f Makefile.msvc clean
+        mkdir -p "build_debug"
+        pushd "build_debug"
+            cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
+                -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)/debug" \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DLIBXML2_WITH_ICONV=OFF \
+                -DLIBXML2_WITH_LZMA=OFF \
+                -DLIBXML2_WITH_PYTHON=OFF \
+                -DLIBXML2_WITH_ZLIB=ON \
+                -DZLIB_INCLUDE_DIRS="$(cygpath -m $stage)/packages/include/zlib/" \
+                -DZLIB_LIBRARIES="$(cygpath -m $stage)/packages/lib/debug/zlibd.lib" \
+                -DZLIB_LIBRARY_DIRS="$(cygpath -m $stage)/packages/lib"
 
-        # Release Build
-        cscript configure.js zlib=yes icu=no static=yes debug=no python=no iconv=no \
-        compiler=msvc cruntime="/MD" \
-        include="$(cygpath -w $stage/packages/include);$(cygpath -w $stage/packages/include/zlib)" \
-        lib="$(cygpath -w $stage/packages/lib/release)" \
-        prefix="$(cygpath -w $stage)" \
-        sodir="$(cygpath -w $stage/lib/release)" \
-        libdir="$(cygpath -w $stage/lib/release)"
-        
-        nmake /f Makefile.msvc ZLIB_LIBRARY=zlib.lib all
-        nmake /f Makefile.msvc install
-        
-        # conditionally run unit tests
-        if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-            # There is one particular test .xml file that has started
-            # failing consistently on our Windows build hosts. The
-            # file is full of errors; but it's as if the test harness
-            # has forgotten that this particular test is SUPPOSED to
-            # produce errors! We can bypass it simply by renaming the
-            # file: the test is based on picking up *.xml from that
-            # directory.
-            # Don't forget, we're in libxml2/win32 at the moment.
-            badtest="$TOP/$SOURCE_DIR/test/errors/759398.xml"
-            [ -f "$badtest" ] && mv "$badtest" "$badtest.hide"
-            nmake /f Makefile.msvc checktests || true
-            # Make sure we move it back after testing. It's not good
-            # for a build script to leave modifications to a source
-            # tree that's under version control.
-            [ -f "$badtest.hide" ] && mv "$badtest.hide" "$badtest"
-        fi
-        
-        nmake /f Makefile.msvc clean
+            cmake --build . --config Debug --clean-first
+            cmake --install . --config Debug
+
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                ctest -C Debug
+            fi
         popd
+
+        mkdir -p "build_release"
+        pushd "build_release"
+            cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
+                -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)/release" \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DLIBXML2_WITH_ICONV=OFF \
+                -DLIBXML2_WITH_LZMA=OFF \
+                -DLIBXML2_WITH_PYTHON=OFF \
+                -DLIBXML2_WITH_ZLIB=ON \
+                -DZLIB_INCLUDE_DIRS="$(cygpath -m $stage)/packages/include/zlib/" \
+                -DZLIB_LIBRARIES="$(cygpath -m $stage)/packages/lib/release/zlib.lib" \
+                -DZLIB_LIBRARY_DIRS="$(cygpath -m $stage)/packages/lib"
+
+            cmake --build . --config Release --clean-first
+            cmake --install . --config Release
+
+            # conditionally run unit tests
+            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                ctest -C Release
+            fi
+        popd
+
+        # Copy libraries
+        cp -a ${stage}/debug/lib/libxml2sd.lib ${stage}/lib/debug/libxml2.lib
+        cp -a ${stage}/release/lib/libxml2s.lib ${stage}/lib/release/libxml2.lib
+
+        # copy headers
+        cp -a $stage/release/include/libxml2/* $stage/include/libxml2/
     ;;
     
     linux*)
@@ -173,8 +135,6 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
         RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
         DEBUG_CPPFLAGS="-DPIC"
         RELEASE_CPPFLAGS="-DPIC -D_FORTIFY_SOURCE=2"
-        
-        JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
         
         # Handle any deliberate platform targeting
         if [ -z "${TARGET_CPPFLAGS:-}" ]; then
@@ -212,7 +172,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
                 --disable-shared --enable-static \
                 --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
 
-            make -j$JOBS
+            make -j$AUTOBUILD_CPU_COUNT
             make install DESTDIR="$stage"
             
             # conditionally run unit tests
@@ -238,7 +198,7 @@ print(':'.join(OrderedDict((dir.rstrip('/'), 1) for dir in sys.argv[1].split(':'
                 --disable-shared --enable-static \
                 --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
 
-            make -j$JOBS
+            make -j$AUTOBUILD_CPU_COUNT
             make install DESTDIR="$stage"
             
             # conditionally run unit tests
