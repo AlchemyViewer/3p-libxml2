@@ -47,16 +47,17 @@ micro_version="$(sed -n -E 's/LIBXML_MICRO_VERSION=([0-9]+)/\1/p' "$configure")"
 version="${major_version}.${minor_version}.${micro_version}"
 echo "${version}" > "${stage}/VERSION.txt"
 
+# Setup staging dirs
+mkdir -p "$stage/include"
+mkdir -p "$stage/lib/debug"
+mkdir -p "$stage/lib/release"
+
 pushd "$TOP/$SOURCE_DIR"
 case "$AUTOBUILD_PLATFORM" in
     
     windows*)
         load_vsvars
         
-        mkdir -p "$stage/include/libxml2"
-        mkdir -p "$stage/lib/debug"
-        mkdir -p "$stage/lib/release"
-
         mkdir -p "build_debug"
         pushd "build_debug"
             cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
@@ -106,7 +107,7 @@ case "$AUTOBUILD_PLATFORM" in
         cp -a ${stage}/release/lib/libxml2s.lib ${stage}/lib/release/libxml2.lib
 
         # copy headers
-        cp -a $stage/release/include/libxml2/* $stage/include/libxml2/
+        cp -a $stage/release/include/* $stage/include/
     ;;
     
     linux*)
@@ -145,67 +146,62 @@ case "$AUTOBUILD_PLATFORM" in
             export CPPFLAGS="$TARGET_CPPFLAGS"
         fi
         
-        # Fix up path for pkgconfig
-        if [ -d "$stage/packages/lib/release/pkgconfig" ]; then
-            fix_pkgconfig_prefix "$stage/packages"
-        fi
-        
-        OLD_PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}"
-        
-        # force regenerate autoconf
-        autoreconf -fvi
-
         mkdir -p "build_debug"
         pushd "build_debug"
-            # debug configure and build
-            export PKG_CONFIG_PATH="$stage/packages/lib/debug/pkgconfig:${OLD_PKG_CONFIG_PATH}"
-            
-            # CPPFLAGS will be used by configure and we need to
-            # get the dependent packages in there as well.  Process
-            # may find the system zlib.h but it won't find the
-            # packaged one.
-            CFLAGS="$DEBUG_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-            CXXFLAGS="$DEBUG_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-            CPPFLAGS="${DEBUG_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
-            LDFLAGS="$opts -L$stage/packages/lib/debug" \
-            ../configure --with-python=no --with-pic --with-zlib --without-lzma \
-                --disable-shared --enable-static \
-                --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug"
+            CFLAGS="$DEBUG_CFLAGS" \
+            CPPFLAGS="$DEBUG_CPPFLAGS" \
+            cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING=ON \
+                -DCMAKE_BUILD_TYPE="Debug" \
+                -DCMAKE_C_FLAGS="$DEBUG_CFLAGS" \
+                -DCMAKE_INSTALL_PREFIX="$stage/debug" \
+                -DLIBXML2_WITH_ICONV=OFF \
+                -DLIBXML2_WITH_LZMA=OFF \
+                -DLIBXML2_WITH_PYTHON=OFF \
+                -DLIBXML2_WITH_ZLIB=ON \
+                -DZLIB_INCLUDE_DIRS="$stage/packages/include/zlib/" \
+                -DZLIB_LIBRARIES="$stage/packages/lib/debug/libz.a" \
+                -DZLIB_LIBRARY_DIRS="$stage/packages/lib"
 
-            make -j$AUTOBUILD_CPU_COUNT
-            make install DESTDIR="$stage"
-            
+            cmake --build . --config Debug
+            cmake --install . --config Debug
+
             # conditionally run unit tests
             if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                make check || true
+                ctest -C Debug
             fi
-	    popd
+        popd
 
         mkdir -p "build_release"
         pushd "build_release"
-            # release configure and build
-            export PKG_CONFIG_PATH="$stage/packages/lib/release/pkgconfig:${OLD_PKG_CONFIG_PATH}"
-            
-            # CPPFLAGS will be used by configure and we need to
-            # get the dependent packages in there as well.  Process
-            # may find the system zlib.h but it won't find the
-            # packaged one.
-            CFLAGS="$RELEASE_CFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-            CXXFLAGS="$RELEASE_CXXFLAGS -I$stage/packages/include/zlib -DALBUILD=1" \
-            CPPFLAGS="${RELEASE_CPPFLAGS:-} -I$stage/packages/include/zlib -DALBUILD=1" \
-            LDFLAGS="$opts -L$stage/packages/lib/release" \
-            ../configure --with-python=no --with-pic --with-zlib --without-lzma \
-                --disable-shared --enable-static \
-                --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release"
+            CFLAGS="$RELEASE_CFLAGS" \
+            CPPFLAGS="$RELEASE_CPPFLAGS" \
+            cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING=ON \
+                -DCMAKE_BUILD_TYPE="Release" \
+                -DCMAKE_C_FLAGS="$RELEASE_CFLAGS" \
+                -DCMAKE_INSTALL_PREFIX="$stage/release" \
+                -DLIBXML2_WITH_ICONV=OFF \
+                -DLIBXML2_WITH_LZMA=OFF \
+                -DLIBXML2_WITH_PYTHON=OFF \
+                -DLIBXML2_WITH_ZLIB=ON \
+                -DZLIB_INCLUDE_DIRS="$stage/packages/include/zlib/" \
+                -DZLIB_LIBRARIES="$stage/packages/lib/release/libz.a" \
+                -DZLIB_LIBRARY_DIRS="$stage/packages/lib"
 
-            make -j$AUTOBUILD_CPU_COUNT
-            make install DESTDIR="$stage"
-            
+            cmake --build . --config Release
+            cmake --install . --config Release
+
             # conditionally run unit tests
             if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                make check || true
+                ctest -C Release
             fi
         popd
+
+        # Copy libraries
+        cp -a ${stage}/debug/lib/*.a ${stage}/lib/debug/
+        cp -a ${stage}/release/lib/*.a ${stage}/lib/release/
+
+        # copy headers
+        cp -a ${stage}/release/include/* ${stage}/include/
     ;;
     
     darwin*)
@@ -311,11 +307,6 @@ case "$AUTOBUILD_PLATFORM" in
                 make check || true
             fi
         popd
-
-        # setup staging dirs
-        mkdir -p "$stage/include"
-        mkdir -p "$stage/lib/debug"
-        mkdir -p "$stage/lib/release"
 
         # create fat libraries
         lipo -create ${stage}/debug_x86/lib/debug/libxml2.a ${stage}/debug_arm64/lib/debug/libxml2.a -output ${stage}/lib/debug/libxml2.a
