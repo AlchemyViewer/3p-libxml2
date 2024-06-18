@@ -13,8 +13,8 @@ jobs:
           addrsize: ${{ matrix.addrsize }}
           build-variables-repo: alchemyviewer/build-variables
           build-variables-ref: alchemy
-          apt-packages: autoconf automake autopoint gettext
-          brew-packages: ninja
+          apt-packages: ninja
+          brew-packages: autoconf automake
   release:
     needs: build
     runs-on: [ubuntu-latest]
