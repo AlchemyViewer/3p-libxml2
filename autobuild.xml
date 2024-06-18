@@ -127,7 +127,6 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/*.a</string>
             <string>lib/release/*.a</string>
 </array>
           <key>build_directory</key>
@@ -158,7 +157,6 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/*.a</string>
             <string>lib/release/*.a</string>
 </array>
           <key>build_directory</key>
@@ -209,7 +207,7 @@
       <key>name</key>
       <string>libxml2</string>
       <key>canonical_repo</key>
-      <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libxml2</string>
+      <string>https://github.com/AlchemyViewer/3p-libxml2</string>
       <key>description</key>
       <string>Libxml2 is the XML C parser and toolkit developed for the Gnome project.</string>
     </map>

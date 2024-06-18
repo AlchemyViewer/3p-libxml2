@@ -24,8 +24,6 @@ else
 fi
 
 stage="$(pwd)"
-[ -f "$stage"/packages/include/zlib/zlib.h ] || \
-{ echo "You haven't installed packages yet." 1>&2; exit 1; }
 
 # load autobuild provided shell functions and variables
 source_environment_tempfile="$stage/source_environment.sh"
@@ -47,20 +45,20 @@ micro_version="$(sed -n -E 's/LIBXML_MICRO_VERSION=([0-9]+)/\1/p' "$configure")"
 version="${major_version}.${minor_version}.${micro_version}"
 echo "${version}" > "${stage}/VERSION.txt"
 
-# Setup staging dirs
-mkdir -p "$stage/include"
-mkdir -p "$stage/lib/debug"
-mkdir -p "$stage/lib/release"
-
 pushd "$TOP/$SOURCE_DIR"
 case "$AUTOBUILD_PLATFORM" in
     
     windows*)
         load_vsvars
-        
+
+        # Setup staging dirs
+        mkdir -p "$stage/include"
+        mkdir -p "$stage/lib/debug"
+        mkdir -p "$stage/lib/release"
+
         mkdir -p "build_debug"
         pushd "build_debug"
-            cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
+            cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Debug \
                 -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)/debug" \
                 -DBUILD_SHARED_LIBS=OFF \
                 -DLIBXML2_WITH_ICONV=OFF \
@@ -71,7 +69,7 @@ case "$AUTOBUILD_PLATFORM" in
                 -DZLIB_LIBRARIES="$(cygpath -m $stage)/packages/lib/debug/zlibd.lib" \
                 -DZLIB_LIBRARY_DIRS="$(cygpath -m $stage)/packages/lib"
 
-            cmake --build . --config Debug --clean-first
+            cmake --build . --config Debug
             cmake --install . --config Debug
 
             # conditionally run unit tests
@@ -82,7 +80,7 @@ case "$AUTOBUILD_PLATFORM" in
 
         mkdir -p "build_release"
         pushd "build_release"
-            cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
+            cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)/release" \
                 -DBUILD_SHARED_LIBS=OFF \
                 -DLIBXML2_WITH_ICONV=OFF \
@@ -93,7 +91,7 @@ case "$AUTOBUILD_PLATFORM" in
                 -DZLIB_LIBRARIES="$(cygpath -m $stage)/packages/lib/release/zlib.lib" \
                 -DZLIB_LIBRARY_DIRS="$(cygpath -m $stage)/packages/lib"
 
-            cmake --build . --config Release --clean-first
+            cmake --build . --config Release
             cmake --install . --config Release
 
             # conditionally run unit tests
@@ -124,18 +122,11 @@ case "$AUTOBUILD_PLATFORM" in
         # So, clear out bits that shouldn't affect our configure-directed build
         # but which do nonetheless.
         #
-        unset DISTCC_HOSTS CC CXX CFLAGS CPPFLAGS CXXFLAGS
-        
+        unset DISTCC_HOSTS CFLAGS CPPFLAGS CXXFLAGS
+
         # Default target per --address-size
-        opts="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE}"
-        DEBUG_COMMON_FLAGS="$opts -Og -g -fPIC"
-        RELEASE_COMMON_FLAGS="$opts -O3 -g -fPIC -fstack-protector-strong"
-        DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
-        RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
-        DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
-        RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
-        DEBUG_CPPFLAGS="-DPIC"
-        RELEASE_CPPFLAGS="-DPIC -D_FORTIFY_SOURCE=2"
+        opts_c="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE_CFLAGS}"
+        opts_cxx="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE_CXXFLAGS}"
         
         # Handle any deliberate platform targeting
         if [ -z "${TARGET_CPPFLAGS:-}" ]; then
@@ -146,45 +137,23 @@ case "$AUTOBUILD_PLATFORM" in
             export CPPFLAGS="$TARGET_CPPFLAGS"
         fi
         
-        mkdir -p "build_debug"
-        pushd "build_debug"
-            CFLAGS="$DEBUG_CFLAGS" \
-            CPPFLAGS="$DEBUG_CPPFLAGS" \
-            cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING=ON \
-                -DCMAKE_BUILD_TYPE="Debug" \
-                -DCMAKE_C_FLAGS="$DEBUG_CFLAGS" \
-                -DCMAKE_INSTALL_PREFIX="$stage/debug" \
-                -DLIBXML2_WITH_ICONV=OFF \
-                -DLIBXML2_WITH_LZMA=OFF \
-                -DLIBXML2_WITH_PYTHON=OFF \
-                -DLIBXML2_WITH_ZLIB=ON \
-                -DZLIB_INCLUDE_DIRS="$stage/packages/include/zlib/" \
-                -DZLIB_LIBRARIES="$stage/packages/lib/debug/libz.a" \
-                -DZLIB_LIBRARY_DIRS="$stage/packages/lib"
-
-            cmake --build . --config Debug
-            cmake --install . --config Debug
-
-            # conditionally run unit tests
-            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                ctest -C Debug
-            fi
-        popd
+        # Setup staging dirs
+        mkdir -p "$stage/include"
+        mkdir -p "$stage/lib"
 
         mkdir -p "build_release"
         pushd "build_release"
-            CFLAGS="$RELEASE_CFLAGS" \
-            CPPFLAGS="$RELEASE_CPPFLAGS" \
+            CFLAGS="$opts_c" \
             cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING=ON \
                 -DCMAKE_BUILD_TYPE="Release" \
-                -DCMAKE_C_FLAGS="$RELEASE_CFLAGS" \
-                -DCMAKE_INSTALL_PREFIX="$stage/release" \
+                -DCMAKE_C_FLAGS="$opts_c" \
+                -DCMAKE_INSTALL_PREFIX="$stage" \
                 -DLIBXML2_WITH_ICONV=OFF \
                 -DLIBXML2_WITH_LZMA=OFF \
                 -DLIBXML2_WITH_PYTHON=OFF \
                 -DLIBXML2_WITH_ZLIB=ON \
-                -DZLIB_INCLUDE_DIRS="$stage/packages/include/zlib/" \
-                -DZLIB_LIBRARIES="$stage/packages/lib/release/libz.a" \
+                -DZLIB_INCLUDE_DIRS="$stage/packages/include/" \
+                -DZLIB_LIBRARIES="$stage/packages/lib/libz.a" \
                 -DZLIB_LIBRARY_DIRS="$stage/packages/lib"
 
             cmake --build . --config Release
@@ -195,68 +164,32 @@ case "$AUTOBUILD_PLATFORM" in
                 ctest -C Release
             fi
         popd
-
-        # Copy libraries
-        cp -a ${stage}/debug/lib/*.a ${stage}/lib/debug/
-        cp -a ${stage}/release/lib/*.a ${stage}/lib/release/
-
-        # copy headers
-        cp -a ${stage}/release/include/* ${stage}/include/
     ;;
     
     darwin*)
-        # Setup osx sdk platform
-        SDKNAME="macosx"
-        export SDKROOT=$(xcodebuild -version -sdk ${SDKNAME} Path)
-
-        # Deploy Targets
-        X86_DEPLOY=10.15
-        ARM64_DEPLOY=11.0
-
         # Setup build flags
-        ARCH_FLAGS_X86="-arch x86_64 -mmacosx-version-min=${X86_DEPLOY} -isysroot ${SDKROOT} -msse4.2"
-        ARCH_FLAGS_ARM64="-arch arm64 -mmacosx-version-min=${ARM64_DEPLOY} -isysroot ${SDKROOT}"
-        DEBUG_COMMON_FLAGS="-O0 -g -fPIC -DPIC"
-        RELEASE_COMMON_FLAGS="-O3 -g -fPIC -DPIC -fstack-protector-strong"
-        DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
-        RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
-        DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
-        RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
-        DEBUG_CPPFLAGS="-DPIC"
-        RELEASE_CPPFLAGS="-DPIC"
-        DEBUG_LDFLAGS="-Wl,-headerpad_max_install_names"
-        RELEASE_LDFLAGS="-Wl,-headerpad_max_install_names"
+        C_OPTS_X86="-arch x86_64 $LL_BUILD_RELEASE_CFLAGS"
+        C_OPTS_ARM64="-arch arm64 $LL_BUILD_RELEASE_CFLAGS"
+        CXX_OPTS_X86="-arch x86_64 $LL_BUILD_RELEASE_CXXFLAGS"
+        CXX_OPTS_ARM64="-arch arm64 $LL_BUILD_RELEASE_CXXFLAGS"
+        LINK_OPTS_X86="-arch x86_64 $LL_BUILD_RELEASE_LINKER"
+        LINK_OPTS_ARM64="-arch arm64 $LL_BUILD_RELEASE_LINKER"
+
+        # deploy target
+        export MACOSX_DEPLOYMENT_TARGET=${LL_BUILD_DARWIN_BASE_DEPLOY_TARGET}
+
+        # Setup staging dirs
+        mkdir -p "$stage/include"
+        mkdir -p "$stage/lib/release"
 
         # force regenerate autoconf
         autoreconf -fvi
 
-        # x86 Deploy Target
-        export MACOSX_DEPLOYMENT_TARGET=${X86_DEPLOY}
-
-        mkdir -p "build_debug_x86"
-        pushd "build_debug_x86"
-            CFLAGS="$ARCH_FLAGS_X86 $DEBUG_CFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CPPFLAGS="$ARCH_FLAGS_X86 $DEBUG_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CXXFLAGS="$ARCH_FLAGS_X86 $DEBUG_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            LDFLAGS="$ARCH_FLAGS_X86 $DEBUG_LDFLAGS -L${stage}/packages/lib/debug" \
-            ../configure --host=x86_64-apple-darwin --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug" \
-                --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
-
-            make -j$AUTOBUILD_CPU_COUNT
-            make install DESTDIR="$stage/debug_x86"
-
-            # conditionally run unit tests
-            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                make check || true
-            fi
-        popd
-
         mkdir -p "build_release_x86"
         pushd "build_release_x86"
-            CFLAGS="$ARCH_FLAGS_X86 $RELEASE_CFLAGS  -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CPPFLAGS="$ARCH_FLAGS_X86 $RELEASE_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CXXFLAGS="$ARCH_FLAGS_X86 $RELEASE_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            LDFLAGS="$ARCH_FLAGS_X86 $RELEASE_LDFLAGS -L${stage}/packages/lib/release" \
+            CFLAGS="$C_OPTS_X86 -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$CXX_OPTS_X86 -I${stage}/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$LINK_OPTS_X86 -L${stage}/packages/lib/release" \
             ../configure --host=x86_64-apple-darwin --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release" \
                 --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
 
@@ -269,33 +202,11 @@ case "$AUTOBUILD_PLATFORM" in
             fi
         popd
 
-        # ARM64 Deploy Target
-        export MACOSX_DEPLOYMENT_TARGET=${ARM64_DEPLOY}
-
-        mkdir -p "build_debug_arm64"
-        pushd "build_debug_arm64"
-            CFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CPPFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CXXFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            LDFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_LDFLAGS -L${stage}/packages/lib/debug" \
-            ../configure --host=aarch64-apple-darwin --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/debug" \
-                --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
-
-            make -j$AUTOBUILD_CPU_COUNT
-            make install DESTDIR="$stage/debug_arm64"
-
-            # conditionally run unit tests
-            if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                make check || true
-            fi
-        popd
-
         mkdir -p "build_release_arm64"
         pushd "build_release_arm64"
-            CFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CFLAGS  -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CPPFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CPPFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            CXXFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CXXFLAGS -I${stage}/packages/include/zlib -DALBUILD=1" \
-            LDFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_LDFLAGS -L${stage}/packages/lib/release" \
+            CFLAGS="$C_OPTS_ARM64 -I${stage}/packages/include/zlib -DALBUILD=1" \
+            CXXFLAGS="$CXX_OPTS_ARM64 -I${stage}/packages/include/zlib -DALBUILD=1" \
+            LDFLAGS="$LINK_OPTS_ARM64 -L${stage}/packages/lib/release" \
             ../configure --host=aarch64-apple-darwin --prefix="\${AUTOBUILD_PACKAGES_DIR}" --libdir="\${prefix}/lib/release" \
                 --with-python=no --with-pic --with-zlib --without-lzma --disable-shared --enable-static
 
@@ -309,7 +220,6 @@ case "$AUTOBUILD_PLATFORM" in
         popd
 
         # create fat libraries
-        lipo -create ${stage}/debug_x86/lib/debug/libxml2.a ${stage}/debug_arm64/lib/debug/libxml2.a -output ${stage}/lib/debug/libxml2.a
         lipo -create ${stage}/release_x86/lib/release/libxml2.a ${stage}/release_arm64/lib/release/libxml2.a -output ${stage}/lib/release/libxml2.a
 
         # copy headers
