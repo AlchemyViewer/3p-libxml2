@@ -157,7 +157,7 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/release/*.a</string>
+            <string>lib/*.a</string>
 </array>
           <key>build_directory</key>
           <string>stage</string>
