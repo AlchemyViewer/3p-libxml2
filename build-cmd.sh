@@ -62,11 +62,11 @@ pushd "$TOP/$SOURCE_DIR"
                     -DZLIB_INCLUDE_DIR="$(cygpath -m "$stage/packages/include/zlib-ng/")" \
                     -DZLIB_LIBRARY="$(cygpath -m "$stage/packages/lib/release/zlib.lib")"
 
-                cmake --build . --config Release
+                cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
+                    ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
                 fi
 
                 cmake --install . --config Release
@@ -100,11 +100,11 @@ pushd "$TOP/$SOURCE_DIR"
                     -DZLIB_INCLUDE_DIR="$stage/packages/include/zlib-ng/" \
                     -DZLIB_LIBRARY="$stage/packages/lib/release/libz.a"
 
-                cmake --build . --config Release
+                cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
+                    ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
                 fi
 
                 cmake --install . --config Release
@@ -114,44 +114,46 @@ pushd "$TOP/$SOURCE_DIR"
         ;;
 
         darwin*)
-            opts="${TARGET_OPTS:--arch $AUTOBUILD_CONFIGURE_ARCH $LL_BUILD_RELEASE}"
-            opts="$(remove_cxxstd $opts)"
+            export MACOSX_DEPLOYMENT_TARGET="$LL_BUILD_DARWIN_DEPLOY_TARGET"
 
-            # deploy target
-            export MACOSX_DEPLOYMENT_TARGET=${LL_BUILD_DARWIN_DEPLOY_TARGET}
+            for arch in x86_64 arm64 ; do
+                ARCH_ARGS="-arch $arch"
+                opts="${TARGET_OPTS:-$ARCH_ARGS $LL_BUILD_RELEASE}"
+                cc_opts="$(remove_cxxstd $opts)"
+                ld_opts="$ARCH_ARGS"
 
-            # Setup staging dirs
-            mkdir -p "$stage/include"
-            mkdir -p "$stage/lib"
-            mkdir -p $stage/lib/release/
+                mkdir -p "build_$arch"
+                pushd "build_$arch"
+                    CFLAGS="$cc_opts" \
+                    CXXFLAGS="$opts" \
+                    LDFLAGS="$ld_opts" \
+                    cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF \
+                        -DCMAKE_BUILD_TYPE="Release" \
+                        -DCMAKE_C_FLAGS="$cc_opts" \
+                        -DCMAKE_CXX_FLAGS="$opts" \
+                        -DCMAKE_INSTALL_PREFIX="$stage" \
+                        -DCMAKE_INSTALL_LIBDIR="$stage/lib/release/$arch" \
+                        -DLIBXML2_WITH_ICONV=ON \
+                        -DLIBXML2_WITH_LZMA=OFF \
+                        -DLIBXML2_WITH_PYTHON=OFF \
+                        -DLIBXML2_WITH_ZLIB=ON \
+                        -DZLIB_INCLUDE_DIR="$stage/packages/include/zlib-ng/" \
+                        -DZLIB_LIBRARY="$stage/packages/lib/release/libz.a" \
+                        -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                        -DCMAKE_OSX_ARCHITECTURES="$arch"
 
-            mkdir -p "build"
-            pushd "build"
-                CFLAGS="$opts" \
-                cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF \
-                    -DCMAKE_BUILD_TYPE="Release" \
-                    -DCMAKE_C_FLAGS="$opts" \
-                    -DCMAKE_INSTALL_PREFIX="$stage" \
-                    -DLIBXML2_WITH_ICONV=ON \
-                    -DLIBXML2_WITH_LZMA=OFF \
-                    -DLIBXML2_WITH_PYTHON=OFF \
-                    -DLIBXML2_WITH_ZLIB=ON \
-                    -DZLIB_INCLUDE_DIR="$stage/packages/include/zlib-ng/" \
-                    -DZLIB_LIBRARY="$stage/packages/lib/release/libz.a" \
-                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
-                    -DCMAKE_OSX_ARCHITECTURES="x86_64"
+                    cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
 
-                cmake --build . --config Release
+                    # conditionally run unit tests
+                    if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                        ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
+                    fi
 
-                # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
-                fi
+                    cmake --install . --config Release
+                popd
+            done
 
-                cmake --install . --config Release
-
-                mv $stage/lib/*.a $stage/lib/release/
-            popd
+            lipo -create -output "$stage/lib/release/libxml2.a" "$stage/lib/release/x86_64/libxml2.a" "$stage/lib/release/arm64/libxml2.a"
         ;;
 
         *)
