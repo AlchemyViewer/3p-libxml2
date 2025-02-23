@@ -32,8 +32,10 @@ source_environment_tempfile="$stage/source_environment.sh"
 "$autobuild" source_environment > "$source_environment_tempfile"
 . "$source_environment_tempfile"
 
-# remove_cxxstd
+# remove_cxxstd apply_patch
 source "$(dirname "$AUTOBUILD_VARIABLES_FILE")/functions"
+
+apply_patch "$TOP/patches/update-cmake-version-compat.patch" "$TOP/$SOURCE_DIR"
 
 pushd "$TOP/$SOURCE_DIR"
     case "$AUTOBUILD_PLATFORM" in
@@ -41,16 +43,49 @@ pushd "$TOP/$SOURCE_DIR"
         windows*)
             load_vsvars
 
-            opts="$(replace_switch /Zi /Z7 $LL_BUILD_RELEASE)"
-            plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
-
             # Setup staging dirs
             mkdir -p "$stage/include"
+            mkdir -p "$stage/lib/debug"
             mkdir -p "$stage/lib/release"
 
-            mkdir -p "build"
-            pushd "build"
+            mkdir -p "build_debug"
+            pushd "build_debug"
+                opts="$(replace_switch /Zi /Z7 $LL_BUILD_DEBUG)"
+                plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
+
+                cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Debug \
+                    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
+                    -DCMAKE_C_FLAGS:STRING="$plainopts" \
+                    -DCMAKE_CXX_FLAGS:STRING="$opts" \
+                    -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
+                    -DBUILD_SHARED_LIBS=OFF \
+                    -DLIBXML2_WITH_ICONV=OFF \
+                    -DLIBXML2_WITH_LZMA=OFF \
+                    -DLIBXML2_WITH_PYTHON=OFF \
+                    -DLIBXML2_WITH_ZLIB=ON \
+                    -DZLIB_INCLUDE_DIR="$(cygpath -m "$stage/packages/include/zlib-ng/")" \
+                    -DZLIB_LIBRARY="$(cygpath -m "$stage/packages/lib/debug/zlibd.lib")"
+
+                cmake --build . --config Debug --parallel $AUTOBUILD_CPU_COUNT
+
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Debug --parallel $AUTOBUILD_CPU_COUNT
+                fi
+
+                cmake --install . --config Debug
+
+                # Copy libraries
+                mv ${stage}/lib/libxml2sd.lib ${stage}/lib/debug/libxml2d.lib
+            popd
+
+            mkdir -p "build_release"
+            pushd "build_release"
+                opts="$(replace_switch /Zi /Z7 $LL_BUILD_RELEASE)"
+                plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
+
                 cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release \
+                    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
                     -DCMAKE_C_FLAGS:STRING="$plainopts" \
                     -DCMAKE_CXX_FLAGS:STRING="$opts" \
                     -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
