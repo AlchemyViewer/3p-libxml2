@@ -1,0 +1,10 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2af1e6f6..b65f3ae5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.18)
++cmake_minimum_required(VERSION 3.18...3.29.0)
+ 
+ file(STRINGS "configure.ac" CONFIGURE_AC_LINES)
+ foreach(line ${CONFIGURE_AC_LINES})
