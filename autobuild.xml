@@ -158,7 +158,8 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/release/*.a</string>
+            <string>lib/sse/release/*.a</string>
+            <string>lib/avx2/release/*.a</string>
           </array>
           <key>build_directory</key>
           <string>stage</string>
@@ -188,8 +189,12 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/libxml2d.lib</string>
-            <string>lib/release/libxml2.lib</string>
+            <string>lib/sse/debug/libxml2d.lib</string>
+            <string>lib/avx2/debug/libxml2d.lib</string>
+            <string>lib/arm64/debug/libxml2d.lib</string>
+            <string>lib/sse/release/libxml2.lib</string>
+            <string>lib/avx2/release/libxml2.lib</string>
+            <string>lib/arm64/release/libxml2.lib</string>
           </array>
           <key>build_directory</key>
           <string>stage</string>

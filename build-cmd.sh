@@ -45,109 +45,132 @@ pushd "$TOP/$SOURCE_DIR"
 
             # Setup staging dirs
             mkdir -p "$stage/include"
-            mkdir -p "$stage/lib/debug"
-            mkdir -p "$stage/lib/release"
 
-            mkdir -p "build_debug"
-            pushd "build_debug"
-                opts="$(replace_switch /Zi /Z7 $LL_BUILD_DEBUG)"
-                plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
-
-                cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
-                    -DCMAKE_CONFIGURATION_TYPES="Debug" \
-                    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
-                    -DCMAKE_C_FLAGS:STRING="$plainopts" \
-                    -DCMAKE_CXX_FLAGS:STRING="$opts" \
-                    -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
-                    -DBUILD_SHARED_LIBS=OFF \
-                    -DLIBXML2_WITH_ICONV=OFF \
-                    -DLIBXML2_WITH_LZMA=OFF \
-                    -DLIBXML2_WITH_PYTHON=OFF \
-                    -DLIBXML2_WITH_ZLIB=ON \
-                    -DZLIB_INCLUDE_DIR="$(cygpath -m "$stage/packages/include/zlib-ng/")" \
-                    -DZLIB_LIBRARY="$(cygpath -m "$stage/packages/lib/debug/zlibd.lib")"
-
-                cmake --build . --config Debug --parallel $AUTOBUILD_CPU_COUNT
-
-                # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Debug --parallel $AUTOBUILD_CPU_COUNT
+            for arch in sse avx2 arm64 ; do
+                platform_target="x64"
+                if [[ "$arch" == "arm64" ]]; then
+                    platform_target="ARM64"
                 fi
 
-                cmake --install . --config Debug
+                mkdir -p "build_debug_$arch"
+                pushd "build_debug_$arch"
+                    opts="$(replace_switch /Zi /Z7 $LL_BUILD_DEBUG)"
+                    if [[ "$arch" == "avx2" ]]; then
+                        opts="$(replace_switch /arch:SSE4.2 /arch:AVX2 $opts)"
+                    elif [[ "$arch" == "arm64" ]]; then
+                        opts="$(remove_switch /arch:SSE4.2 $opts)"
+                    fi
+                    plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
 
-                # Copy libraries
-                mv ${stage}/lib/libxml2sd.lib ${stage}/lib/debug/libxml2d.lib
-            popd
+                    cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$platform_target" .. \
+                        -DCMAKE_CONFIGURATION_TYPES="Debug" \
+                        -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
+                        -DCMAKE_C_FLAGS:STRING="$plainopts" \
+                        -DCMAKE_CXX_FLAGS:STRING="$opts" \
+                        -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
+                        -DBUILD_SHARED_LIBS=OFF \
+                        -DLIBXML2_WITH_ICONV=OFF \
+                        -DLIBXML2_WITH_LZMA=OFF \
+                        -DLIBXML2_WITH_PYTHON=OFF \
+                        -DLIBXML2_WITH_ZLIB=ON \
+                        -DZLIB_INCLUDE_DIR="$(cygpath -m "$stage/packages/include/zlib-ng/")" \
+                        -DZLIB_LIBRARY="$(cygpath -m "$stage/packages/lib/$arch/debug/zlibd.lib")"
 
-            mkdir -p "build_release"
-            pushd "build_release"
-                opts="$(replace_switch /Zi /Z7 $LL_BUILD_RELEASE)"
-                plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
+                    cmake --build . --config Debug --parallel $AUTOBUILD_CPU_COUNT
 
-                cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" .. \
-                    -DCMAKE_CONFIGURATION_TYPES="Release" \
-                    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
-                    -DCMAKE_C_FLAGS:STRING="$plainopts" \
-                    -DCMAKE_CXX_FLAGS:STRING="$opts" \
-                    -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
-                    -DBUILD_SHARED_LIBS=OFF \
-                    -DLIBXML2_WITH_ICONV=OFF \
-                    -DLIBXML2_WITH_LZMA=OFF \
-                    -DLIBXML2_WITH_PYTHON=OFF \
-                    -DLIBXML2_WITH_ZLIB=ON \
-                    -DZLIB_INCLUDE_DIR="$(cygpath -m "$stage/packages/include/zlib-ng/")" \
-                    -DZLIB_LIBRARY="$(cygpath -m "$stage/packages/lib/release/zlib.lib")"
+                    # conditionally run unit tests
+                    if [[ "${DISABLE_UNIT_TESTS:-0}" == "0" && "$arch" != "arm64" ]]; then
+                        ctest -C Debug --parallel $AUTOBUILD_CPU_COUNT
+                    fi
 
-                cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
+                    cmake --install . --config Debug
 
-                # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
-                fi
+                    # Copy libraries
+                    mkdir -p "$stage/lib/$arch/debug"
+                    mv ${stage}/lib/libxml2sd.lib ${stage}/lib/$arch/debug/libxml2d.lib
+                popd
 
-                cmake --install . --config Release
+                mkdir -p "build_release_$arch"
+                pushd "build_release_$arch"
+                    opts="$(replace_switch /Zi /Z7 $LL_BUILD_RELEASE)"
+                    if [[ "$arch" == "avx2" ]]; then
+                        opts="$(replace_switch /arch:SSE4.2 /arch:AVX2 $opts)"
+                    elif [[ "$arch" == "arm64" ]]; then
+                        opts="$(remove_switch /arch:SSE4.2 $opts)"
+                    fi
+                    plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
 
-                # Copy libraries
-                mv ${stage}/lib/libxml2s.lib ${stage}/lib/release/libxml2.lib
-            popd
+                    cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$platform_target" .. \
+                        -DCMAKE_CONFIGURATION_TYPES="Release" \
+                        -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
+                        -DCMAKE_C_FLAGS:STRING="$plainopts" \
+                        -DCMAKE_CXX_FLAGS:STRING="$opts" \
+                        -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
+                        -DBUILD_SHARED_LIBS=OFF \
+                        -DLIBXML2_WITH_ICONV=OFF \
+                        -DLIBXML2_WITH_LZMA=OFF \
+                        -DLIBXML2_WITH_PYTHON=OFF \
+                        -DLIBXML2_WITH_ZLIB=ON \
+                        -DZLIB_INCLUDE_DIR="$(cygpath -m "$stage/packages/include/zlib-ng/")" \
+                        -DZLIB_LIBRARY="$(cygpath -m "$stage/packages/lib/$arch/release/zlib.lib")"
+
+                    cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
+
+                    # conditionally run unit tests
+                    if [[ "${DISABLE_UNIT_TESTS:-0}" == "0" && "$arch" != "arm64" ]]; then
+                        ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
+                    fi
+
+                    cmake --install . --config Release
+
+                    # Copy libraries
+                    mkdir -p "$stage/lib/$arch/release"
+                    mv ${stage}/lib/libxml2s.lib ${stage}/lib/$arch/release/libxml2.lib
+                popd
+            done
         ;;
 
         linux*)
-            # Default target per autobuild build --address-size
-            opts="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE}"
-            opts="$(remove_cxxstd $opts)"
 
             # Setup staging dirs
             mkdir -p "$stage/include"
             mkdir -p "$stage/lib"
-            mkdir -p $stage/lib/release/
 
-            mkdir -p "build_release"
-            pushd "build_release"
-                CFLAGS="$opts" \
-                cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF \
-                    -DCMAKE_BUILD_TYPE="Release" \
-                    -DCMAKE_C_FLAGS="$opts" \
-                    -DCMAKE_INSTALL_PREFIX="$stage" \
-                    -DLIBXML2_WITH_ICONV=ON \
-                    -DLIBXML2_WITH_LZMA=OFF \
-                    -DLIBXML2_WITH_PYTHON=OFF \
-                    -DLIBXML2_WITH_ZLIB=ON \
-                    -DZLIB_INCLUDE_DIR="$stage/packages/include/zlib-ng/" \
-                    -DZLIB_LIBRARY="$stage/packages/lib/release/libz.a"
-
-                cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
-
-                # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
+            for arch in sse avx2 ; do
+                # Default target per autobuild build --address-size
+                opts="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE}"
+                if [[ "$arch" == "avx2" ]]; then
+                    opts="$(replace_switch -march=x86-64-v2 -march=x86-64-v3 $opts)"
                 fi
+                plainopts="$(remove_cxxstd $opts)"
 
-                cmake --install . --config Release
+                # Release
+                mkdir -p "build_$arch"
+                pushd "build_$arch"
+                    cmake .. -GNinja -DBUILD_SHARED_LIBS:BOOL=OFF \
+                        -DCMAKE_BUILD_TYPE="Release" \
+                        -DCMAKE_C_FLAGS="$plainopts" \
+                        -DCMAKE_INSTALL_PREFIX="$stage" \
+                        -DLIBXML2_WITH_ICONV=ON \
+                        -DLIBXML2_WITH_LZMA=OFF \
+                        -DLIBXML2_WITH_PYTHON=OFF \
+                        -DLIBXML2_WITH_ZLIB=ON \
+                        -DZLIB_INCLUDE_DIR="$stage/packages/include/zlib-ng/" \
+                        -DZLIB_LIBRARY="$stage/packages/lib/$arch/release/libz.a"
 
-                mv $stage/lib/*.a $stage/lib/release/
-            popd
+                    cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
+
+                    # conditionally run unit tests
+                    if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                        ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
+                    fi
+
+                    cmake --install . --config Release
+
+                    mkdir -p $stage/lib/$arch/release/
+                    mv $stage/lib/*.a $stage/lib/$arch/release/
+                popd
+            done
         ;;
 
         darwin*)
